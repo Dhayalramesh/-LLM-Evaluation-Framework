@@ -1,0 +1,11 @@
+question,expected,answer,exact_match,llm_judge,rule_based,overall
+What is the capital of France?,Paris,l'ondre,False,False,False,False
+Who wrote 'Hamlet'?,Shakespeare,john scott,False,False,False,False
+What is 2 + 2?,4,a slender slender,False,False,False,False
+What is the largest planet?,Jupiter,venus,False,False,False,False
+What is the boiling point of water?,100°C,a vapor,False,False,False,False
+Who is the current US president?,Joe Biden,john w. bush,False,False,False,False
+What is the currency of Japan?,Yen,yen,True,True,True,True
+What is the tallest mountain?,Everest,st johns,False,False,False,False
+What is the square root of 9?,3,,False,False,False,False
+What year did WW2 end?,1945,1912,False,False,False,False
