@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 from difflib import SequenceMatcher
-from transformers import pipeline
+import torch
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 st.set_page_config(page_title="LLM Evaluation Framework", layout="wide")
 st.title("📊 LLM Evaluation Framework")
@@ -24,13 +25,24 @@ DATASET = [
 
 # ---------- Load model (cached) ----------
 @st.cache_resource
-def load_generator():
-    return pipeline("text2text-generation", model="google/flan-t5-small", max_length=50)
+def load_model():
+    tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
+    model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
+    model.to("cpu")
+    return tokenizer, model
 
-generator = load_generator()
+tokenizer, model = load_model()
 
 def get_model_answer(question: str) -> str:
-    return generator(question)[0]['generated_text'].strip()
+    inputs = tokenizer(question, return_tensors="pt", truncation=True, max_length=128)
+    inputs = {k: v.to("cpu") for k, v in inputs.items()}
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=50,
+            pad_token_id=tokenizer.eos_token_id
+        )
+    return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
 # ---------- Scoring functions ----------
 def exact_match(answer, expected):
@@ -49,13 +61,17 @@ def combined_score(answer, expected):
     return {"exact_match": em, "llm_judge": lj, "rule_based": rb, "overall": em or lj or rb}
 
 # ---------- Evaluation runner ----------
-def evaluate_model(question, expected):
-    answer = get_model_answer(question)
-    scores = combined_score(answer, expected)
-    return {"question": question, "expected": expected, "answer": answer, **scores}
-
 def run_evaluation():
-    results = [evaluate_model(item["input"], item["expected"]) for item in DATASET]
+    results = []
+    for item in DATASET:
+        answer = get_model_answer(item["input"])
+        scores = combined_score(answer, item["expected"])
+        results.append({
+            "question": item["input"],
+            "expected": item["expected"],
+            "answer": answer,
+            **scores
+        })
     df = pd.DataFrame(results)
     df.to_csv("eval_results.csv", index=False)
     return df
@@ -63,8 +79,7 @@ def run_evaluation():
 def get_regression():
     if os.path.exists("eval_results.csv"):
         prev = pd.read_csv("eval_results.csv")
-        prev_pass = prev["overall"].mean()
-        return prev_pass
+        return prev["overall"].mean()
     return None
 
 # ---------- Streamlit UI ----------
